@@ -13,6 +13,8 @@ tests, and documentation.
 
 - Train a geospatial/tabular ML model to predict radiation dose rate from
   contamination, soil, terrain, hydrology, exposure, and location features.
+- Train an optional advanced classic model from real environmental and nuclide
+  CSV files with spatial cross-validation.
 - Compare scenarios by changing input parameters and measuring predicted risk deltas.
 - Explain predictions using SHAP when available, with a feature-importance fallback.
 - Upload technical PDFs, retrieve relevant chunks, answer questions, and cite sources.
@@ -28,11 +30,13 @@ tests, and documentation.
 ```text
 app/          FastAPI backend, schemas, orchestration services
 ml/           data generation, geospatial helpers, feature engineering, training, prediction
+ml/classic/   advanced real-data model, spatial CV, artifact registry
 rag/          PDF ingestion, retrieval store, LLM client, Q&A assistant
 frontend/     Streamlit UI
 tests/        unit tests for ML, RAG, and API health
 docs/         architecture notes, API examples, screenshot folder
 models/       generated model artifacts
+data/processed/ real-data CSV drop zone
 storage/      uploaded PDFs and retrieval index
 ```
 
@@ -102,13 +106,22 @@ Copy-Item .env.example .env
 Important variables:
 
 - `GEORISK_API_URL`: frontend-to-backend URL.
+- `GEORISK_DATA_MODE`: `synthetic` or `real`; current default endpoints remain
+  synthetic, while advanced endpoints explicitly use real data.
 - `GEORISK_API_KEY`: required API key for protected endpoints.
 - `GEORISK_ALLOW_UNAUTHENTICATED`: local-only escape hatch. Keep `false` outside
   throwaway demos.
 - `GEORISK_CORS_ALLOW_ORIGINS`: comma-separated browser origins allowed by CORS.
 - `GEORISK_RATE_LIMIT_*`: in-memory rate limiting controls.
 - `GEORISK_MODEL_PATH`: model artifact path.
+- `GEORISK_ADVANCED_MODEL_PATH`: advanced model artifact path.
 - `GEORISK_RAG_INDEX_PATH`: retrieval index path.
+- `GEORISK_REAL_ENV_DATA_PATH`: path to `train_env_v1.csv`.
+- `GEORISK_REAL_NUCLIDE_DATA_PATH`: path to `train_nuclide_v1.csv`.
+- `GEORISK_REAL_TARGET_COLUMN`: real-data target column, defaults to
+  `dose_rate_usv_h`.
+- `GEORISK_REAL_RECORD_ID_COLUMN`: merge key for env and nuclide CSVs, defaults
+  to `sample_id`.
 - `GEORISK_UPLOAD_DIR`: uploaded PDF storage path.
 - `GEORISK_MAX_UPLOAD_MB`: max PDF upload size.
 - `GEORISK_PDF_PROCESSING_TIMEOUT_SECONDS`: PDF ingestion timeout.
@@ -153,12 +166,41 @@ For real GIS layers, `ml/geospatial.py` includes optional GeoPandas helpers for
 converting latitude/longitude records into point geometries and enriching records
 with nearest-layer distances.
 
+## Advanced Real-Data Model
+
+Place original-project CSVs here:
+
+```text
+data/processed/train_env_v1.csv
+data/processed/train_nuclide_v1.csv
+```
+
+The advanced flow expects the nuclide table to contain:
+
+```text
+cs137_kBq_m2, sr90_kBq_m2, k40_Bq_kg, ra226_Bq_kg, th232_Bq_kg
+```
+
+and a target column, defaulting to `dose_rate_usv_h`. If both CSV files contain
+`GEORISK_REAL_RECORD_ID_COLUMN`, they are merged by that key; otherwise equal-row
+files are aligned by row order. Advanced training uses spatial group
+cross-validation when latitude/longitude are present.
+
+Train advanced model:
+
+```powershell
+uv run --with-requirements requirements-dev.txt python -m ml.classic.train
+```
+
 ## API Endpoints
 
 - `GET /health`
 - `POST /ml/train`
+- `POST /ml/train/advanced`
 - `POST /ml/predict`
+- `POST /ml/predict/advanced`
 - `POST /ml/scenarios`
+- `POST /ml/scenarios/advanced`
 - `POST /ml/explain`
 - `POST /rag/upload`
 - `POST /rag/ask`
@@ -186,8 +228,9 @@ uv run --with-requirements requirements-dev.txt ruff format --check .
 ```
 
 The tests cover model training/prediction/explanation, scenario sensitivity,
-retrieval with citations, API health, request observability, and prediction
-caching. The same checks run in GitHub Actions through `.github/workflows/ci.yml`.
+advanced real-data loading/training/prediction, retrieval with citations, API
+health, request observability, and prediction caching. The same checks run in
+GitHub Actions through `.github/workflows/ci.yml`.
 
 ## Troubleshooting
 

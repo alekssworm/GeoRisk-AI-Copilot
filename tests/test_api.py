@@ -98,6 +98,36 @@ def test_rate_limit_returns_429(monkeypatch):
     assert second.status_code == 429
 
 
+def test_advanced_predict_endpoint(monkeypatch):
+    configure_api_key(monkeypatch)
+
+    def fake_advanced_prediction_for(features):
+        return {
+            "dose_rate_usv_h": 0.42,
+            "risk_level": "Elevated",
+            "advisory": "Check advanced model assumptions.",
+            "model_version": "classic-real-test",
+            "data_mode": "real",
+            "features_used": features.to_feature_dict(),
+        }
+
+    monkeypatch.setattr(main_module, "advanced_prediction_for", fake_advanced_prediction_for)
+    client = TestClient(app)
+    response = client.post("/ml/predict/advanced", json={}, headers=AUTH_HEADERS)
+
+    assert response.status_code == 200
+    assert response.json()["data_mode"] == "real"
+
+
+def test_advanced_train_endpoint_reports_missing_real_data(monkeypatch):
+    configure_api_key(monkeypatch)
+    client = TestClient(app)
+    response = client.post("/ml/train/advanced", json={}, headers=AUTH_HEADERS)
+
+    assert response.status_code == 404
+    assert "Real training data file not found" in response.json()["detail"]
+
+
 def test_scenario_endpoint_rejects_unknown_override(monkeypatch):
     configure_api_key(monkeypatch)
     client = TestClient(app)

@@ -19,6 +19,10 @@ from app.config import (
     UPLOAD_DIR,
 )
 from app.schemas import (
+    AdvancedPredictionResponse,
+    AdvancedRadiationFeatures,
+    AdvancedScenarioComparisonRequest,
+    AdvancedTrainRequest,
     PredictionResponse,
     RAGAnswerResponse,
     RAGQuestionRequest,
@@ -29,12 +33,16 @@ from app.schemas import (
     RadiationFeatures,
 )
 from app.services import (
+    advanced_compare_for,
+    advanced_prediction_for,
     compare_for,
     explanation_for,
     generate_report,
     prediction_for,
     rag_answer_for,
 )
+from ml.classic.predict import clear_advanced_model_cache
+from ml.classic.train import train_advanced_model
 from app.security import require_api_key, rate_limiter
 from ml.predict import clear_prediction_cache
 from ml.train import train_model
@@ -117,14 +125,57 @@ def train(request: TrainRequest) -> dict:
     }
 
 
+@app.post("/ml/train/advanced", dependencies=[Depends(require_api_key)])
+def train_advanced(request: AdvancedTrainRequest) -> dict:
+    try:
+        artifact = train_advanced_model(
+            n_estimators=request.n_estimators,
+            random_state=request.random_state,
+            cv_splits=request.cv_splits,
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    clear_advanced_model_cache()
+    return {
+        "message": "Advanced model trained",
+        "model_version": artifact.model_version,
+        "metrics": artifact.metrics,
+        "cv_metrics": artifact.cv_metrics,
+        "training_rows": artifact.training_rows,
+    }
+
+
 @app.post("/ml/predict", response_model=PredictionResponse, dependencies=[Depends(require_api_key)])
 def predict(features: RadiationFeatures) -> dict:
     return prediction_for(features)
 
 
+@app.post(
+    "/ml/predict/advanced",
+    response_model=AdvancedPredictionResponse,
+    dependencies=[Depends(require_api_key)],
+)
+def predict_advanced(features: AdvancedRadiationFeatures) -> dict:
+    try:
+        return advanced_prediction_for(features)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
 @app.post("/ml/scenarios", dependencies=[Depends(require_api_key)])
 def scenarios(request: ScenarioComparisonRequest) -> list[dict]:
     return compare_for(request.baseline, request.scenarios)
+
+
+@app.post("/ml/scenarios/advanced", dependencies=[Depends(require_api_key)])
+def scenarios_advanced(request: AdvancedScenarioComparisonRequest) -> list[dict]:
+    try:
+        return advanced_compare_for(request.baseline, request.scenarios)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @app.post("/ml/explain", dependencies=[Depends(require_api_key)])

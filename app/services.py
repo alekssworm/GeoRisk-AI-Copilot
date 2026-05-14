@@ -1,5 +1,12 @@
-from app.schemas import RAGAnswerResponse, RadiationFeatures, ScenarioInput
+from app.schemas import (
+    AdvancedRadiationFeatures,
+    AdvancedScenarioInput,
+    RAGAnswerResponse,
+    RadiationFeatures,
+    ScenarioInput,
+)
 from ml.explain import explain_prediction
+from ml.classic.predict import compare_advanced_scenarios, predict_advanced_dose
 from ml.predict import compare_scenarios, predict_dose
 from rag.qa import RAGAssistant
 
@@ -13,6 +20,20 @@ def compare_for(baseline: RadiationFeatures, scenarios: list[ScenarioInput]) -> 
         {"name": scenario.name, "overrides": scenario.overrides} for scenario in scenarios
     ]
     return compare_scenarios(baseline.to_feature_dict(), scenario_payload)
+
+
+def advanced_prediction_for(features: AdvancedRadiationFeatures) -> dict:
+    return predict_advanced_dose(features.to_feature_dict())
+
+
+def advanced_compare_for(
+    baseline: AdvancedRadiationFeatures,
+    scenarios: list[AdvancedScenarioInput],
+) -> list[dict]:
+    scenario_payload = [
+        {"name": scenario.name, "overrides": scenario.overrides} for scenario in scenarios
+    ]
+    return compare_advanced_scenarios(baseline.to_feature_dict(), scenario_payload)
 
 
 def explanation_for(features: RadiationFeatures) -> dict:

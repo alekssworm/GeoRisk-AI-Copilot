@@ -62,6 +62,7 @@ class InMemoryRateLimiter:
         self.window_seconds = window_seconds
         self.rules = {
             "/ml/train": TRAIN_RATE_LIMIT_REQUESTS,
+            "/ml/train/advanced": TRAIN_RATE_LIMIT_REQUESTS,
             "/rag/upload": UPLOAD_RATE_LIMIT_REQUESTS,
             "/rag/ask": RAG_RATE_LIMIT_REQUESTS,
             "/reports/risk": RAG_RATE_LIMIT_REQUESTS,

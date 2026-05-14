@@ -78,3 +78,17 @@ GEORISK_RAG_RATE_LIMIT_REQUESTS
 
 Some PDFs contain scanned images without embedded text. Use OCR first, then upload
 the text-searchable PDF.
+
+## Advanced model says real data files are missing
+
+The advanced flow does not fabricate production data. Add the original project
+CSVs or update the paths:
+
+```text
+GEORISK_REAL_ENV_DATA_PATH=data/processed/train_env_v1.csv
+GEORISK_REAL_NUCLIDE_DATA_PATH=data/processed/train_nuclide_v1.csv
+```
+
+The nuclide CSV must include `cs137_kBq_m2`, `sr90_kBq_m2`, `k40_Bq_kg`,
+`ra226_Bq_kg`, `th232_Bq_kg`, and the configured target column
+(`dose_rate_usv_h` by default).
