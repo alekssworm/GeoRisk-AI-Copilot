@@ -1,0 +1,26 @@
+services:
+  api:
+    build: .
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GEORISK_LLM_MODEL: ${GEORISK_LLM_MODEL:-gpt-4o-mini}
+    volumes:
+      - ./models:/app/models
+      - ./storage:/app/storage
+
+  frontend:
+    build: .
+    command: streamlit run frontend/streamlit_app.py --server.address 0.0.0.0 --server.port 8501
+    ports:
+      - "8501:8501"
+    environment:
+      GEORISK_API_URL: http://api:8000
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GEORISK_LLM_MODEL: ${GEORISK_LLM_MODEL:-gpt-4o-mini}
+    depends_on:
+      - api
+    volumes:
+      - ./storage:/app/storage
