@@ -47,8 +47,8 @@ ENGINEERED_FEATURE_COLUMNS = [
 
 MODEL_FEATURE_COLUMNS = BASE_FEATURE_COLUMNS + ENGINEERED_FEATURE_COLUMNS
 
-REAL_TARGET_COLUMN = os.getenv("GEORISK_REAL_TARGET_COLUMN", TARGET_COLUMN)
-REAL_RECORD_ID_COLUMN = os.getenv("GEORISK_REAL_RECORD_ID_COLUMN", "sample_id")
+REAL_TARGET_COLUMN = os.getenv("GEORISK_REAL_TARGET_COLUMN", "target_dose_rate")
+REAL_RECORD_ID_COLUMN = os.getenv("GEORISK_REAL_RECORD_ID_COLUMN", "Code")
 
 REAL_NUCLIDE_FEATURE_COLUMNS = list_from_env(
     "GEORISK_REAL_NUCLIDE_FEATURE_COLUMNS",
@@ -64,30 +64,27 @@ REAL_NUCLIDE_FEATURE_COLUMNS = list_from_env(
 REAL_ENV_FEATURE_COLUMNS = list_from_env(
     "GEORISK_REAL_ENV_FEATURE_COLUMNS",
     [
-        "latitude",
-        "longitude",
+        "organic_carbon_b0",
+        "organic_carbon_b10",
+        "clay_fraction_0_30",
+        "clay_fraction_30_60",
+        "sand_fraction_b0",
+        "sand_fraction_b10",
+        "bulk_density_b0",
+        "bulk_density_b10",
+        "soil_pH_b0",
+        "soil_pH_b10",
         "elevation_m",
-        "slope_deg",
-        "distance_to_water_km",
-        "rainfall_mm_year",
-        "soil_clay_pct",
-        "soil_organic_pct",
-        "population_density_km2",
-        "land_cover_urban_pct",
+        "slope_deg_final",
+        "twi_scaled",
     ],
 )
 
-REAL_ENGINEERED_FEATURE_COLUMNS = [
-    "total_fallout_kBq_m2",
-    "natural_activity_index",
-    "cs137_sr90_ratio",
-    "log_cs137",
-    "spatial_lat_lon_interaction",
-]
+REAL_SPATIAL_COLUMNS = ["latitude", "longitude"]
+REAL_RATIO_FEATURE_COLUMNS = ["ratio_cs_sr"]
+REAL_ENGINEERED_FEATURE_COLUMNS = []
 
-REAL_MODEL_FEATURE_COLUMNS = (
-    REAL_NUCLIDE_FEATURE_COLUMNS + REAL_ENV_FEATURE_COLUMNS + REAL_ENGINEERED_FEATURE_COLUMNS
-)
+REAL_MODEL_FEATURE_COLUMNS = REAL_ENV_FEATURE_COLUMNS + REAL_NUCLIDE_FEATURE_COLUMNS
 
 DEFAULT_BASE_FEATURES = {
     "contamination_bq_m2": 35000.0,
@@ -104,21 +101,27 @@ DEFAULT_BASE_FEATURES = {
 }
 
 DEFAULT_REAL_FEATURES = {
-    "cs137_kBq_m2": 35.0,
-    "sr90_kBq_m2": 4.0,
-    "k40_Bq_kg": 420.0,
-    "ra226_Bq_kg": 35.0,
-    "th232_Bq_kg": 32.0,
-    "latitude": DEFAULT_BASE_FEATURES["latitude"],
-    "longitude": DEFAULT_BASE_FEATURES["longitude"],
-    "elevation_m": DEFAULT_BASE_FEATURES["elevation_m"],
-    "slope_deg": DEFAULT_BASE_FEATURES["slope_deg"],
-    "distance_to_water_km": DEFAULT_BASE_FEATURES["distance_to_water_km"],
-    "rainfall_mm_year": DEFAULT_BASE_FEATURES["rainfall_mm_year"],
-    "soil_clay_pct": DEFAULT_BASE_FEATURES["soil_clay_pct"],
-    "soil_organic_pct": DEFAULT_BASE_FEATURES["soil_organic_pct"],
-    "population_density_km2": DEFAULT_BASE_FEATURES["population_density_km2"],
-    "land_cover_urban_pct": DEFAULT_BASE_FEATURES["land_cover_urban_pct"],
+    "latitude": 50.9712,
+    "longitude": 29.8660,
+    "organic_carbon_b0": 4.0,
+    "organic_carbon_b10": 4.0,
+    "clay_fraction_0_30": 16.0,
+    "clay_fraction_30_60": 17.0,
+    "sand_fraction_b0": 59.0,
+    "sand_fraction_b10": 59.0,
+    "bulk_density_b0": 132.0,
+    "bulk_density_b10": 131.0,
+    "soil_pH_b0": 62.0,
+    "soil_pH_b10": 62.0,
+    "elevation_m": 136.0,
+    "slope_deg_final": 10.0,
+    "twi_scaled": 5.68,
+    "cs137_kBq_m2": 27.4,
+    "sr90_kBq_m2": 4.2,
+    "ratio_cs_sr": 6.52,
+    "k40_Bq_kg": 120.0,
+    "ra226_Bq_kg": 11.0,
+    "th232_Bq_kg": 8.0,
 }
 
 RISK_THRESHOLDS = [

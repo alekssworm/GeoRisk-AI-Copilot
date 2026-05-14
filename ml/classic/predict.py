@@ -4,7 +4,13 @@ from pathlib import Path
 from ml.classic.feature_sets import ALLOWED_ADVANCED_OVERRIDES
 from ml.classic.model_registry import ClassicModelArtifact, load_artifact
 from ml.classic.train import train_advanced_model
-from ml.config import ADVANCED_MODEL_PATH, REAL_ENV_FEATURE_COLUMNS, REAL_NUCLIDE_FEATURE_COLUMNS
+from ml.config import (
+    ADVANCED_MODEL_PATH,
+    REAL_ENV_FEATURE_COLUMNS,
+    REAL_NUCLIDE_FEATURE_COLUMNS,
+    REAL_RATIO_FEATURE_COLUMNS,
+    REAL_SPATIAL_COLUMNS,
+)
 from ml.features import build_real_feature_frame
 from ml.predict import classify_risk
 
@@ -23,7 +29,7 @@ def clear_advanced_model_cache() -> None:
 
 def predict_advanced_dose(features: dict, model_path: str | Path = ADVANCED_MODEL_PATH) -> dict:
     artifact = load_advanced_model(model_path)
-    feature_frame = build_real_feature_frame(features)
+    feature_frame = build_real_feature_frame(features, feature_columns=artifact.feature_names)
     prediction = max(0.0, float(artifact.pipeline.predict(feature_frame)[0]))
     risk_level, advisory = classify_risk(prediction)
     return {
@@ -32,6 +38,8 @@ def predict_advanced_dose(features: dict, model_path: str | Path = ADVANCED_MODE
         "advisory": advisory,
         "model_version": artifact.model_version,
         "data_mode": artifact.data_mode,
+        "model_name": artifact.model_name,
+        "feature_set": artifact.feature_set,
         "features_used": feature_frame.iloc[0].to_dict(),
     }
 
@@ -39,7 +47,14 @@ def predict_advanced_dose(features: dict, model_path: str | Path = ADVANCED_MODE
 def _validate_advanced_overrides(overrides: dict) -> None:
     unknown = sorted(set(overrides) - ALLOWED_ADVANCED_OVERRIDES)
     if unknown:
-        allowed = ", ".join(REAL_NUCLIDE_FEATURE_COLUMNS + REAL_ENV_FEATURE_COLUMNS)
+        allowed = ", ".join(
+            sorted(
+                REAL_NUCLIDE_FEATURE_COLUMNS
+                + REAL_ENV_FEATURE_COLUMNS
+                + REAL_RATIO_FEATURE_COLUMNS
+                + REAL_SPATIAL_COLUMNS
+            )
+        )
         raise ValueError(
             f"Unsupported advanced scenario override(s): {', '.join(unknown)}. "
             f"Allowed fields: {allowed}"

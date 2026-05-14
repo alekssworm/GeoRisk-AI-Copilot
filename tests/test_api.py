@@ -108,6 +108,8 @@ def test_advanced_predict_endpoint(monkeypatch):
             "advisory": "Check advanced model assumptions.",
             "model_version": "classic-real-test",
             "data_mode": "real",
+            "model_name": "extra_trees",
+            "feature_set": "env_plus_no_ratio",
             "features_used": features.to_feature_dict(),
         }
 
@@ -121,6 +123,11 @@ def test_advanced_predict_endpoint(monkeypatch):
 
 def test_advanced_train_endpoint_reports_missing_real_data(monkeypatch):
     configure_api_key(monkeypatch)
+
+    def fake_train_advanced_model(**kwargs):
+        raise FileNotFoundError("Real training data file not found: missing.csv")
+
+    monkeypatch.setattr(main_module, "train_advanced_model", fake_train_advanced_model)
     client = TestClient(app)
     response = client.post("/ml/train/advanced", json={}, headers=AUTH_HEADERS)
 

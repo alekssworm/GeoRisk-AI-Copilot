@@ -15,6 +15,7 @@ storage/*
 !storage/.gitkeep
 data/generated/*
 !data/generated/.gitkeep
+external/
 
 .DS_Store
 Thumbs.db

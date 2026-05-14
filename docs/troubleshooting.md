@@ -89,6 +89,10 @@ GEORISK_REAL_ENV_DATA_PATH=data/processed/train_env_v1.csv
 GEORISK_REAL_NUCLIDE_DATA_PATH=data/processed/train_nuclide_v1.csv
 ```
 
-The nuclide CSV must include `cs137_kBq_m2`, `sr90_kBq_m2`, `k40_Bq_kg`,
-`ra226_Bq_kg`, `th232_Bq_kg`, and the configured target column
-(`dose_rate_usv_h` by default).
+The nuclide CSV must include the MVP-B fields used by the primary model:
+`organic_carbon_b0`, `organic_carbon_b10`, `clay_fraction_0_30`,
+`clay_fraction_30_60`, `sand_fraction_b0`, `sand_fraction_b10`,
+`bulk_density_b0`, `bulk_density_b10`, `soil_pH_b0`, `soil_pH_b10`,
+`elevation_m`, `slope_deg_final`, `twi_scaled`, `cs137_kBq_m2`,
+`sr90_kBq_m2`, `k40_Bq_kg`, `ra226_Bq_kg`, `th232_Bq_kg`, and the configured
+target column (`target_dose_rate` by default).

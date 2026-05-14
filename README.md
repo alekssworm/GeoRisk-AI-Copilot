@@ -13,8 +13,9 @@ tests, and documentation.
 
 - Train a geospatial/tabular ML model to predict radiation dose rate from
   contamination, soil, terrain, hydrology, exposure, and location features.
-- Train an optional advanced classic model from real environmental and nuclide
-  CSV files with spatial cross-validation.
+- Train an optional advanced classic model from the original
+  `Radiation_Dose_Rate_Prediction` MVP-B environmental and nuclide CSV files
+  with spatial block cross-validation.
 - Compare scenarios by changing input parameters and measuring predicted risk deltas.
 - Explain predictions using SHAP when available, with a feature-importance fallback.
 - Upload technical PDFs, retrieve relevant chunks, answer questions, and cite sources.
@@ -119,9 +120,9 @@ Important variables:
 - `GEORISK_REAL_ENV_DATA_PATH`: path to `train_env_v1.csv`.
 - `GEORISK_REAL_NUCLIDE_DATA_PATH`: path to `train_nuclide_v1.csv`.
 - `GEORISK_REAL_TARGET_COLUMN`: real-data target column, defaults to
-  `dose_rate_usv_h`.
+  `target_dose_rate`.
 - `GEORISK_REAL_RECORD_ID_COLUMN`: merge key for env and nuclide CSVs, defaults
-  to `sample_id`.
+  to `Code`.
 - `GEORISK_UPLOAD_DIR`: uploaded PDF storage path.
 - `GEORISK_MAX_UPLOAD_MB`: max PDF upload size.
 - `GEORISK_PDF_PROCESSING_TIMEOUT_SECONDS`: PDF ingestion timeout.
@@ -168,29 +169,50 @@ with nearest-layer distances.
 
 ## Advanced Real-Data Model
 
-Place original-project CSVs here:
+The original-project CSVs are tracked in:
 
 ```text
 data/processed/train_env_v1.csv
 data/processed/train_nuclide_v1.csv
 ```
 
+The default advanced model mirrors MVP-B:
+
+```text
+model: extra_trees
+feature_set: env_plus_no_ratio
+target: target_dose_rate
+spatial_cv_block_size_deg: 0.02
+```
+
 The advanced flow expects the nuclide table to contain:
 
 ```text
-cs137_kBq_m2, sr90_kBq_m2, k40_Bq_kg, ra226_Bq_kg, th232_Bq_kg
+organic_carbon_b0, organic_carbon_b10, clay_fraction_0_30,
+clay_fraction_30_60, sand_fraction_b0, sand_fraction_b10,
+bulk_density_b0, bulk_density_b10, soil_pH_b0, soil_pH_b10,
+elevation_m, slope_deg_final, twi_scaled, cs137_kBq_m2,
+sr90_kBq_m2, k40_Bq_kg, ra226_Bq_kg, th232_Bq_kg
 ```
 
-and a target column, defaulting to `dose_rate_usv_h`. If both CSV files contain
-`GEORISK_REAL_RECORD_ID_COLUMN`, they are merged by that key; otherwise equal-row
-files are aligned by row order. Advanced training uses spatial group
-cross-validation when latitude/longitude are present.
+and a target column, defaulting to `target_dose_rate`. If the nuclide file
+already contains the full MVP-B feature set, it is used directly to preserve the
+original 545-row training table. Advanced training uses spatial block CV when
+latitude/longitude are present.
 
 Train advanced model:
 
 ```powershell
 uv run --with-requirements requirements-dev.txt python -m ml.classic.train
 ```
+
+Compare the integrated MVP-B model with the current project baselines:
+
+```powershell
+uv run --with-requirements requirements-dev.txt python -m ml.classic.compare_models
+```
+
+This writes `docs/model_comparison.md`.
 
 ## API Endpoints
 

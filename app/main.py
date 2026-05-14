@@ -132,6 +132,9 @@ def train_advanced(request: AdvancedTrainRequest) -> dict:
             n_estimators=request.n_estimators,
             random_state=request.random_state,
             cv_splits=request.cv_splits,
+            model_name=request.model_name,
+            feature_set=request.feature_set,
+            block_size_deg=request.block_size_deg,
         )
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -145,6 +148,8 @@ def train_advanced(request: AdvancedTrainRequest) -> dict:
         "metrics": artifact.metrics,
         "cv_metrics": artifact.cv_metrics,
         "training_rows": artifact.training_rows,
+        "model_name": artifact.model_name,
+        "feature_set": artifact.feature_set,
     }
 
 

@@ -60,7 +60,14 @@ Train the advanced real-data model:
 curl -X POST http://localhost:8000/ml/train/advanced \
   -H "Content-Type: application/json" \
   -H "X-API-Key: $GEORISK_API_KEY" \
-  -d '{"n_estimators": 300, "random_state": 42, "cv_splits": 5}'
+  -d '{
+    "n_estimators": 500,
+    "random_state": 42,
+    "cv_splits": 5,
+    "model_name": "extra_trees",
+    "feature_set": "env_plus_no_ratio",
+    "block_size_deg": 0.02
+  }'
 ```
 
 Predict with advanced nuclide features:
@@ -70,13 +77,27 @@ curl -X POST http://localhost:8000/ml/predict/advanced \
   -H "Content-Type: application/json" \
   -H "X-API-Key: $GEORISK_API_KEY" \
   -d '{
-    "cs137_kBq_m2": 35,
-    "sr90_kBq_m2": 4,
-    "k40_Bq_kg": 420,
-    "ra226_Bq_kg": 35,
-    "th232_Bq_kg": 32,
-    "latitude": 59.91,
-    "longitude": 10.75
+    "latitude": 50.9712,
+    "longitude": 29.866,
+    "organic_carbon_b0": 4,
+    "organic_carbon_b10": 4,
+    "clay_fraction_0_30": 16,
+    "clay_fraction_30_60": 17,
+    "sand_fraction_b0": 59,
+    "sand_fraction_b10": 59,
+    "bulk_density_b0": 132,
+    "bulk_density_b10": 131,
+    "soil_pH_b0": 62,
+    "soil_pH_b10": 62,
+    "elevation_m": 136,
+    "slope_deg_final": 10,
+    "twi_scaled": 5.68,
+    "cs137_kBq_m2": 27.4,
+    "sr90_kBq_m2": 4.2,
+    "ratio_cs_sr": 6.52,
+    "k40_Bq_kg": 120,
+    "ra226_Bq_kg": 11,
+    "th232_Bq_kg": 8
   }'
 ```
 
