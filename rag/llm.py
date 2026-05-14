@@ -1,5 +1,7 @@
 import os
 
+from rag.config import LLM_MAX_PROMPT_CHARS
+
 
 class LLMClient:
     def __init__(self, model: str | None = None):
@@ -9,6 +11,9 @@ class LLMClient:
     def generate(self, prompt: str) -> str | None:
         if not self.api_key:
             return None
+
+        if len(prompt) > LLM_MAX_PROMPT_CHARS:
+            prompt = prompt[:LLM_MAX_PROMPT_CHARS]
 
         try:
             from openai import OpenAI
@@ -29,5 +34,5 @@ class LLMClient:
                 ],
             )
             return response.choices[0].message.content
-        except Exception as exc:
-            return f"LLM generation failed, using retrieved evidence only. Error: {exc}"
+        except Exception:
+            return "LLM generation failed, using retrieved evidence only."

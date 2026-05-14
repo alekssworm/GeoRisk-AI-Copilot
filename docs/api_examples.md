@@ -11,6 +11,7 @@ Predict risk:
 ```bash
 curl -X POST http://localhost:8000/ml/predict \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: $GEORISK_API_KEY" \
   -d '{
     "contamination_bq_m2": 35000,
     "soil_clay_pct": 28,
@@ -31,6 +32,7 @@ Compare scenarios:
 ```bash
 curl -X POST http://localhost:8000/ml/scenarios \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: $GEORISK_API_KEY" \
   -d '{
     "baseline": {
       "contamination_bq_m2": 35000,
@@ -57,5 +59,9 @@ Ask the RAG assistant after uploading PDFs:
 ```bash
 curl -X POST http://localhost:8000/rag/ask \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: $GEORISK_API_KEY" \
   -d '{"question": "What monitoring actions are recommended after heavy rainfall?", "top_k": 4}'
 ```
+
+Protected POST endpoints require `X-API-Key` unless
+`GEORISK_ALLOW_UNAUTHENTICATED=true` is explicitly enabled for local demos.

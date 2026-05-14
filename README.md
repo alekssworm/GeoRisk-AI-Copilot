@@ -64,6 +64,8 @@ model retraining.
 Recommended with `uv`:
 
 ```powershell
+Copy-Item .env.example .env
+# Edit .env and set GEORISK_API_KEY to a random local secret.
 uv run --with-requirements requirements-dev.txt python -m ml.train
 uv run --with-requirements requirements-dev.txt uvicorn app.main:app --reload
 ```
@@ -100,13 +102,33 @@ Copy-Item .env.example .env
 Important variables:
 
 - `GEORISK_API_URL`: frontend-to-backend URL.
+- `GEORISK_API_KEY`: required API key for protected endpoints.
+- `GEORISK_ALLOW_UNAUTHENTICATED`: local-only escape hatch. Keep `false` outside
+  throwaway demos.
+- `GEORISK_CORS_ALLOW_ORIGINS`: comma-separated browser origins allowed by CORS.
+- `GEORISK_RATE_LIMIT_*`: in-memory rate limiting controls.
 - `GEORISK_MODEL_PATH`: model artifact path.
 - `GEORISK_RAG_INDEX_PATH`: retrieval index path.
 - `GEORISK_UPLOAD_DIR`: uploaded PDF storage path.
 - `GEORISK_MAX_UPLOAD_MB`: max PDF upload size.
+- `GEORISK_PDF_PROCESSING_TIMEOUT_SECONDS`: PDF ingestion timeout.
 - `GEORISK_RAG_CHUNK_SIZE` and `GEORISK_RAG_CHUNK_OVERLAP`: retrieval chunking controls.
+- `GEORISK_LLM_MAX_PROMPT_CHARS`: max prompt size sent to the LLM client.
 - `OPENAI_API_KEY`: optional key for LLM-based answer synthesis.
 - `GEORISK_LLM_MODEL`: optional LLM model name.
+
+## Security
+
+- CORS is restricted to local Streamlit origins by default. Do not use wildcard
+  origins with credentials in production.
+- Protected endpoints require `X-API-Key` by default. Set the same
+  `GEORISK_API_KEY` in the API and frontend environments.
+- Uploads use generated server-side filenames, size limits, and PDF processing
+  timeouts.
+- API requests are protected by an in-memory rate limiter. Use a shared limiter
+  such as Redis when scaling to multiple API workers.
+- LLM errors returned to users are intentionally generic so provider credentials
+  are not reflected back through API responses.
 
 ## Model Training and Evaluation
 

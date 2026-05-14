@@ -43,6 +43,37 @@ Then verify:
 Invoke-RestMethod http://127.0.0.1:8000/health
 ```
 
+## `401 Missing or invalid API key`
+
+Protected POST endpoints require `GEORISK_API_KEY` by default. Set it in `.env`,
+restart the API and frontend, then send the same value from the frontend sidebar
+or in API requests:
+
+```powershell
+Invoke-RestMethod `
+  -Method Post `
+  -Uri http://127.0.0.1:8000/ml/predict `
+  -Headers @{ "X-API-Key" = $env:GEORISK_API_KEY } `
+  -ContentType "application/json" `
+  -Body "{}"
+```
+
+For throwaway local demos only, you can set `GEORISK_ALLOW_UNAUTHENTICATED=true`.
+Do not use that setting for deployed environments.
+
+## `429 Rate limit exceeded`
+
+The API includes an in-memory limiter for expensive endpoints. For local testing,
+wait for the configured window to reset or tune:
+
+```text
+GEORISK_RATE_LIMIT_WINDOW_SECONDS
+GEORISK_RATE_LIMIT_REQUESTS
+GEORISK_TRAIN_RATE_LIMIT_REQUESTS
+GEORISK_UPLOAD_RATE_LIMIT_REQUESTS
+GEORISK_RAG_RATE_LIMIT_REQUESTS
+```
+
 ## PDF uploads return no chunks
 
 Some PDFs contain scanned images without embedded text. Use OCR first, then upload

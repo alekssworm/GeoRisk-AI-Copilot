@@ -17,6 +17,7 @@ from ml.config import DEFAULT_BASE_FEATURES  # noqa: E402
 
 
 API_URL = os.getenv("GEORISK_API_URL", "http://localhost:8000")
+API_KEY = os.getenv("GEORISK_API_KEY", "")
 
 
 st.set_page_config(page_title="GeoRisk AI Copilot", layout="wide")
@@ -27,6 +28,13 @@ st.caption(
 
 
 def post_api(base_url: str, path: str, **kwargs):
+    headers = dict(kwargs.pop("headers", {}) or {})
+    api_key = st.session_state.get("api_key", "").strip()
+    if api_key:
+        headers["X-API-Key"] = api_key
+    if headers:
+        kwargs["headers"] = headers
+
     try:
         response = requests.post(f"{base_url.rstrip('/')}{path}", **kwargs)
     except RequestException as exc:
@@ -59,6 +67,7 @@ def location_frame(features: dict, label: str) -> pd.DataFrame:
 with st.sidebar:
     st.header("Connection")
     api_url = st.text_input("FastAPI URL", API_URL)
+    st.text_input("API key", value=API_KEY, type="password", key="api_key")
     st.divider()
     if st.button("Train / refresh model"):
         with st.spinner("Training model..."):

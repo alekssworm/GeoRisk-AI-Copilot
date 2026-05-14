@@ -29,3 +29,17 @@ def int_from_env(env_name: str, default: int, min_value: int | None = None) -> i
     if min_value is not None:
         value = max(min_value, value)
     return value
+
+
+def bool_from_env(env_name: str, default: bool = False) -> bool:
+    raw_value = os.getenv(env_name)
+    if raw_value in (None, ""):
+        return default
+    return raw_value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def list_from_env(env_name: str, default: list[str]) -> list[str]:
+    raw_value = os.getenv(env_name)
+    if raw_value in (None, ""):
+        return default
+    return [item.strip() for item in raw_value.split(",") if item.strip()]

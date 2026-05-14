@@ -9,7 +9,7 @@ ALLOWED_FEATURE_OVERRIDES = set(BASE_FEATURE_COLUMNS)
 
 
 class StrictBaseModel(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
 
 class RadiationFeatures(StrictBaseModel):
@@ -42,7 +42,7 @@ class PredictionResponse(StrictBaseModel):
 
 
 class ScenarioInput(StrictBaseModel):
-    name: str = Field(..., min_length=1)
+    name: str = Field(..., min_length=1, max_length=100)
     overrides: dict[str, float] = Field(default_factory=dict)
 
     @field_validator("overrides")
@@ -68,7 +68,7 @@ class TrainRequest(StrictBaseModel):
 
 
 class RAGQuestionRequest(StrictBaseModel):
-    question: str = Field(..., min_length=3)
+    question: str = Field(..., min_length=3, max_length=4000)
     top_k: int = Field(4, ge=1, le=10)
 
 
@@ -81,7 +81,7 @@ class RAGAnswerResponse(StrictBaseModel):
 class RiskReportRequest(StrictBaseModel):
     baseline: RadiationFeatures
     scenarios: list[ScenarioInput] = Field(default_factory=list)
-    rag_question: str | None = None
+    rag_question: str | None = Field(default=None, max_length=4000)
 
 
 class RiskReportResponse(StrictBaseModel):

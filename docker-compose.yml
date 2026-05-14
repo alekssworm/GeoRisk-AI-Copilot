@@ -7,6 +7,9 @@ services:
     environment:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       GEORISK_LLM_MODEL: ${GEORISK_LLM_MODEL:-gpt-4o-mini}
+      GEORISK_API_KEY: ${GEORISK_API_KEY:?Set GEORISK_API_KEY before docker compose up}
+      GEORISK_ALLOW_UNAUTHENTICATED: ${GEORISK_ALLOW_UNAUTHENTICATED:-false}
+      GEORISK_CORS_ALLOW_ORIGINS: ${GEORISK_CORS_ALLOW_ORIGINS:-http://localhost:8501,http://127.0.0.1:8501}
     volumes:
       - ./models:/app/models
       - ./storage:/app/storage
@@ -18,6 +21,8 @@ services:
       - "8501:8501"
     environment:
       GEORISK_API_URL: http://api:8000
+      GEORISK_API_KEY: ${GEORISK_API_KEY:?Set GEORISK_API_KEY before docker compose up}
+      GEORISK_ALLOW_UNAUTHENTICATED: ${GEORISK_ALLOW_UNAUTHENTICATED:-false}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       GEORISK_LLM_MODEL: ${GEORISK_LLM_MODEL:-gpt-4o-mini}
     depends_on:
