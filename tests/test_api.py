@@ -4,7 +4,6 @@ import app.main as main_module
 from app.main import app
 from app.security import API_KEY_HEADER_NAME, rate_limiter
 
-
 TEST_API_KEY = "test-secret"
 AUTH_HEADERS = {API_KEY_HEADER_NAME: TEST_API_KEY}
 
@@ -21,6 +20,23 @@ def test_health_endpoint():
     assert response.json()["status"] == "ok"
     assert "X-Request-ID" in response.headers
     assert "X-Process-Time-ms" in response.headers
+
+
+def test_root_redirects_to_frontend():
+    client = TestClient(app, follow_redirects=False)
+    response = client.get("/")
+
+    assert response.status_code == 307
+    assert response.headers["location"].endswith(":8501")
+
+
+def test_detailed_health_reports_dependencies():
+    client = TestClient(app)
+    response = client.get("/health/details")
+
+    assert response.status_code == 200
+    assert "checks" in response.json()
+    assert response.json()["dependencies"]["python-multipart"] is True
 
 
 def test_cors_rejects_unlisted_origin():
@@ -121,6 +137,35 @@ def test_advanced_predict_endpoint(monkeypatch):
     assert response.json()["data_mode"] == "real"
 
 
+def test_batch_prediction_endpoint(monkeypatch):
+    configure_api_key(monkeypatch)
+
+    def fake_batch(records):
+        predictions = [
+            {
+                "dose_rate_usv_h": 0.12,
+                "risk_level": "Low",
+                "advisory": "Continue routine monitoring.",
+                "model_version": "test-model",
+                "features_used": item.to_feature_dict(),
+            }
+            for item in records
+        ]
+        return {"predictions": predictions, "count": len(predictions)}
+
+    monkeypatch.setattr(main_module, "batch_predictions_for", fake_batch)
+    client = TestClient(app)
+    response = client.post(
+        "/ml/predict/batch",
+        json={"records": [{}, {}]},
+        headers=AUTH_HEADERS,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["count"] == 2
+    assert len(response.json()["predictions"]) == 2
+
+
 def test_advanced_train_endpoint_reports_missing_real_data(monkeypatch):
     configure_api_key(monkeypatch)
 
@@ -147,6 +192,20 @@ def test_scenario_endpoint_rejects_unknown_override(monkeypatch):
 
     assert response.status_code == 422
     assert "Unsupported scenario override" in response.text
+
+
+def test_scenario_endpoint_validates_merged_values(monkeypatch):
+    configure_api_key(monkeypatch)
+    client = TestClient(app)
+    payload = {
+        "baseline": {},
+        "scenarios": [{"name": "Impossible soil", "overrides": {"soil_clay_pct": 140}}],
+    }
+
+    response = client.post("/ml/scenarios", json=payload, headers=AUTH_HEADERS)
+
+    assert response.status_code == 422
+    assert "less than or equal to 100" in response.text
 
 
 def test_pdf_upload_rejects_invalid_pdf(monkeypatch):

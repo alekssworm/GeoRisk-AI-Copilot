@@ -7,6 +7,9 @@ __pycache__/
 .venv/
 venv/
 .env
+.run/
+.idea/
+output/
 
 models/*.joblib
 models/*.json

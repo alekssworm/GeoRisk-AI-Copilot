@@ -1,7 +1,9 @@
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from ml.classic.feature_sets import DEFAULT_FEATURE_SET, list_feature_sets
+from ml.classic.model_registry import DEFAULT_MODEL_NAME, list_model_names
 from ml.config import (
     BASE_FEATURE_COLUMNS,
     DEFAULT_BASE_FEATURES,
@@ -11,9 +13,6 @@ from ml.config import (
     REAL_RATIO_FEATURE_COLUMNS,
     REAL_SPATIAL_COLUMNS,
 )
-from ml.classic.feature_sets import DEFAULT_FEATURE_SET, list_feature_sets
-from ml.classic.model_registry import DEFAULT_MODEL_NAME, list_model_names
-
 
 ALLOWED_FEATURE_OVERRIDES = set(BASE_FEATURE_COLUMNS)
 ALLOWED_ADVANCED_FEATURE_OVERRIDES = set(
@@ -49,12 +48,29 @@ class RadiationFeatures(StrictBaseModel):
         return self.dict()
 
 
+class UncertaintyEstimate(StrictBaseModel):
+    method: str
+    lower_usv_h: float | None = None
+    upper_usv_h: float | None = None
+    std_usv_h: float | None = None
+    confidence_label: str
+    calibrated: bool = False
+
+
+class DistributionCheck(StrictBaseModel):
+    is_out_of_distribution: bool
+    features: list[str] = Field(default_factory=list)
+    warning: str | None = None
+
+
 class PredictionResponse(StrictBaseModel):
     dose_rate_usv_h: float
     risk_level: str
     advisory: str
     model_version: str
     features_used: dict[str, float]
+    uncertainty: UncertaintyEstimate | None = None
+    distribution_check: DistributionCheck | None = None
 
 
 class AdvancedRadiationFeatures(StrictBaseModel):
@@ -127,12 +143,35 @@ class AdvancedScenarioInput(StrictBaseModel):
 
 class ScenarioComparisonRequest(StrictBaseModel):
     baseline: RadiationFeatures
-    scenarios: list[ScenarioInput] = Field(default_factory=list)
+    scenarios: list[ScenarioInput] = Field(default_factory=list, max_length=20)
+
+    @model_validator(mode="after")
+    def validate_merged_scenarios(self):
+        baseline = self.baseline.to_feature_dict()
+        for scenario in self.scenarios:
+            RadiationFeatures(**(baseline | scenario.overrides))
+        return self
 
 
 class AdvancedScenarioComparisonRequest(StrictBaseModel):
     baseline: AdvancedRadiationFeatures
-    scenarios: list[AdvancedScenarioInput] = Field(default_factory=list)
+    scenarios: list[AdvancedScenarioInput] = Field(default_factory=list, max_length=20)
+
+    @model_validator(mode="after")
+    def validate_merged_scenarios(self):
+        baseline = self.baseline.to_feature_dict()
+        for scenario in self.scenarios:
+            AdvancedRadiationFeatures(**(baseline | scenario.overrides))
+        return self
+
+
+class BatchPredictionRequest(StrictBaseModel):
+    records: list[RadiationFeatures] = Field(..., min_length=1, max_length=1000)
+
+
+class BatchPredictionResponse(StrictBaseModel):
+    predictions: list[PredictionResponse]
+    count: int
 
 
 class TrainRequest(StrictBaseModel):
@@ -178,8 +217,15 @@ class RAGAnswerResponse(StrictBaseModel):
 
 class RiskReportRequest(StrictBaseModel):
     baseline: RadiationFeatures
-    scenarios: list[ScenarioInput] = Field(default_factory=list)
+    scenarios: list[ScenarioInput] = Field(default_factory=list, max_length=20)
     rag_question: str | None = Field(default=None, max_length=4000)
+
+    @model_validator(mode="after")
+    def validate_merged_scenarios(self):
+        baseline = self.baseline.to_feature_dict()
+        for scenario in self.scenarios:
+            RadiationFeatures(**(baseline | scenario.overrides))
+        return self
 
 
 class RiskReportResponse(StrictBaseModel):

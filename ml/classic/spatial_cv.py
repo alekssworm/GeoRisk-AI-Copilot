@@ -25,9 +25,10 @@ def infer_block_origin(
 
 def make_spatial_group_labels(
     frame: pd.DataFrame,
-    spec: SpatialCVSpec = SpatialCVSpec(),
+    spec: SpatialCVSpec | None = None,
     origin: tuple[float, float] | None = None,
 ) -> np.ndarray:
+    spec = spec or SpatialCVSpec()
     if spec.latitude_col not in frame or spec.longitude_col not in frame:
         return np.arange(len(frame))
     if spec.block_size_deg <= 0:

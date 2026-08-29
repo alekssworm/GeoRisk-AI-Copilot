@@ -2,7 +2,6 @@ import os
 
 from project_config import list_from_env, project_path_from_env
 
-
 DATA_MODE = os.getenv("GEORISK_DATA_MODE", "synthetic").strip().lower()
 
 MODEL_PATH = project_path_from_env("GEORISK_MODEL_PATH", "models/georisk_model.joblib")

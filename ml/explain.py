@@ -43,7 +43,7 @@ def explain_prediction(
         if isinstance(raw_base, (list, np.ndarray)):
             raw_base = raw_base[0]
         base_value = float(raw_base)
-    except Exception:
+    except Exception:  # noqa: BLE001 - SHAP failures must use deterministic fallback
         contributions, method = _fallback_contributions(artifact, feature_frame)
 
     rows = []

@@ -1,18 +1,23 @@
 from app.schemas import (
     AdvancedRadiationFeatures,
     AdvancedScenarioInput,
-    RAGAnswerResponse,
     RadiationFeatures,
+    RAGAnswerResponse,
     ScenarioInput,
 )
-from ml.explain import explain_prediction
 from ml.classic.predict import compare_advanced_scenarios, predict_advanced_dose
+from ml.explain import explain_prediction
 from ml.predict import compare_scenarios, predict_dose
 from rag.qa import RAGAssistant
 
 
 def prediction_for(features: RadiationFeatures) -> dict:
     return predict_dose(features.to_feature_dict())
+
+
+def batch_predictions_for(records: list[RadiationFeatures]) -> dict:
+    predictions = [prediction_for(features) for features in records]
+    return {"predictions": predictions, "count": len(predictions)}
 
 
 def compare_for(baseline: RadiationFeatures, scenarios: list[ScenarioInput]) -> list[dict]:
@@ -76,11 +81,29 @@ def generate_report(
         citations = ", ".join(citation["citation_id"] for citation in rag_answer.citations)
         rag_section = f"{rag_answer.answer}\n\nCitations: {citations or 'none'}"
 
+    uncertainty = prediction.get("uncertainty") or {}
+    if uncertainty.get("lower_usv_h") is not None:
+        uncertainty_text = (
+            f"The tree-ensemble P10-P90 spread is "
+            f"**{uncertainty['lower_usv_h']:.3f}-{uncertainty['upper_usv_h']:.3f} uSv/h** "
+            f"({uncertainty['confidence_label']} relative confidence). This spread is not calibrated."
+        )
+    else:
+        uncertainty_text = "Model uncertainty is not available for this prediction."
+
+    distribution = prediction.get("distribution_check") or {}
+    distribution_warning = distribution.get("warning")
+    if distribution_warning:
+        uncertainty_text += f"\n\n**Extrapolation warning:** {distribution_warning}"
+
     report_markdown = f"""# GeoRisk AI Copilot Risk Analysis
 
 ## Executive Summary
 The baseline predicted radiation dose rate is **{prediction["dose_rate_usv_h"]:.3f} uSv/h**.
 The current risk level is **{prediction["risk_level"]}**. {prediction["advisory"]}
+
+## Model Confidence
+{uncertainty_text}
 
 ## Scenario Comparison
 {scenario_lines}

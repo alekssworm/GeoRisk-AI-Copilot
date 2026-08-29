@@ -34,5 +34,5 @@ class LLMClient:
                 ],
             )
             return response.choices[0].message.content
-        except Exception:
+        except Exception:  # noqa: BLE001 - provider failures use the local grounded answer
             return "LLM generation failed, using retrieved evidence only."

@@ -1,6 +1,8 @@
 from functools import lru_cache
 from pathlib import Path
 
+import numpy as np
+
 from ml.classic.feature_sets import ALLOWED_ADVANCED_OVERRIDES
 from ml.classic.model_registry import ClassicModelArtifact, load_artifact
 from ml.classic.train import train_advanced_model
@@ -27,6 +29,37 @@ def clear_advanced_model_cache() -> None:
     load_advanced_model.cache_clear()
 
 
+def _advanced_uncertainty(artifact: ClassicModelArtifact, feature_frame, prediction: float) -> dict:
+    model = artifact.pipeline.named_steps["model"]
+    estimators = getattr(model, "estimators_", None)
+    if not estimators:
+        return {
+            "method": "not_available",
+            "lower_usv_h": None,
+            "upper_usv_h": None,
+            "std_usv_h": None,
+            "confidence_label": "not_available",
+            "calibrated": False,
+        }
+
+    transformed = artifact.pipeline[:-1].transform(feature_frame)
+    predictions = np.asarray(
+        [float(estimator.predict(transformed)[0]) for estimator in estimators], dtype=float
+    )
+    lower = max(0.0, float(np.quantile(predictions, 0.10)))
+    upper = max(0.0, float(np.quantile(predictions, 0.90)))
+    relative_width = (upper - lower) / max(abs(prediction), 0.05)
+    confidence = "high" if relative_width <= 0.25 else "medium" if relative_width <= 0.50 else "low"
+    return {
+        "method": "tree_ensemble_p10_p90",
+        "lower_usv_h": round(lower, 4),
+        "upper_usv_h": round(upper, 4),
+        "std_usv_h": round(float(np.std(predictions, ddof=0)), 4),
+        "confidence_label": confidence,
+        "calibrated": False,
+    }
+
+
 def predict_advanced_dose(features: dict, model_path: str | Path = ADVANCED_MODEL_PATH) -> dict:
     artifact = load_advanced_model(model_path)
     feature_frame = build_real_feature_frame(features, feature_columns=artifact.feature_names)
@@ -41,6 +74,8 @@ def predict_advanced_dose(features: dict, model_path: str | Path = ADVANCED_MODE
         "model_name": artifact.model_name,
         "feature_set": artifact.feature_set,
         "features_used": feature_frame.iloc[0].to_dict(),
+        "uncertainty": _advanced_uncertainty(artifact, feature_frame, prediction),
+        "distribution_check": None,
     }
 
 

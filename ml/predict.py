@@ -1,17 +1,76 @@
+from copy import deepcopy
 from functools import lru_cache
 from pathlib import Path
-from copy import deepcopy
 
 import joblib
+import numpy as np
 
 from ml.artifact import ModelArtifact
 from ml.config import BASE_FEATURE_COLUMNS, MODEL_PATH, RISK_THRESHOLDS
 from ml.features import build_feature_frame
 from ml.train import train_model
 
-
 ALLOWED_FEATURE_OVERRIDES = set(BASE_FEATURE_COLUMNS)
 PREDICTION_CACHE_SIZE = 512
+
+
+def _uncertainty_estimate(artifact: ModelArtifact, feature_frame, prediction: float) -> dict:
+    model = artifact.pipeline.named_steps["model"]
+    estimators = getattr(model, "estimators_", None)
+    if not estimators:
+        return {
+            "method": "not_available",
+            "lower_usv_h": None,
+            "upper_usv_h": None,
+            "std_usv_h": None,
+            "confidence_label": "not_available",
+            "calibrated": False,
+        }
+
+    transformed = artifact.pipeline.named_steps["imputer"].transform(feature_frame)
+    tree_predictions = np.asarray(
+        [float(estimator.predict(transformed)[0]) for estimator in estimators], dtype=float
+    )
+    lower = max(0.0, float(np.quantile(tree_predictions, 0.10)))
+    upper = max(0.0, float(np.quantile(tree_predictions, 0.90)))
+    std = float(np.std(tree_predictions, ddof=0))
+    relative_width = (upper - lower) / max(abs(prediction), 0.05)
+    confidence = "high" if relative_width <= 0.25 else "medium" if relative_width <= 0.50 else "low"
+    return {
+        "method": "tree_ensemble_p10_p90",
+        "lower_usv_h": round(lower, 4),
+        "upper_usv_h": round(upper, 4),
+        "std_usv_h": round(std, 4),
+        "confidence_label": confidence,
+        "calibrated": False,
+    }
+
+
+def _distribution_check(artifact: ModelArtifact, feature_frame) -> dict:
+    outliers = []
+    for feature in artifact.feature_names:
+        stats = artifact.feature_stats.get(feature)
+        if not stats:
+            continue
+        std = float(stats.get("std", 0.0) or 0.0)
+        if std <= 0:
+            continue
+        value = float(feature_frame.iloc[0][feature])
+        z_score = (value - float(stats.get("mean", 0.0))) / std
+        if np.isfinite(z_score) and abs(z_score) > 3.5:
+            outliers.append(feature)
+
+    warning = None
+    if outliers:
+        warning = (
+            "Some inputs are far outside the training distribution; treat this prediction "
+            "as an extrapolation and validate it with field measurements."
+        )
+    return {
+        "is_out_of_distribution": bool(outliers),
+        "features": outliers,
+        "warning": warning,
+    }
 
 
 @lru_cache(maxsize=4)
@@ -21,7 +80,7 @@ def load_model(model_path: str | Path = MODEL_PATH) -> ModelArtifact:
         train_model(model_path=path)
     try:
         return joblib.load(path)
-    except Exception:
+    except Exception:  # noqa: BLE001 - incompatible/corrupt artifacts are retrained
         return train_model(model_path=path)
 
 
@@ -58,6 +117,8 @@ def _predict_dose_cached(model_path: str, feature_key: tuple[tuple[str, float], 
         "advisory": advisory,
         "model_version": artifact.model_version,
         "features_used": feature_frame.iloc[0].to_dict(),
+        "uncertainty": _uncertainty_estimate(artifact, feature_frame, prediction),
+        "distribution_check": _distribution_check(artifact, feature_frame),
     }
 
 
@@ -67,9 +128,7 @@ def predict_dose(features: dict, model_path: str | Path = MODEL_PATH) -> dict:
 
 def _validate_scenario_overrides(overrides: dict) -> None:
     if not isinstance(overrides, dict):
-        raise ValueError(
-            "Scenario overrides must be an object of feature names and numeric values."
-        )
+        raise TypeError("Scenario overrides must be an object of feature names and numeric values.")
 
     unknown = sorted(set(overrides) - ALLOWED_FEATURE_OVERRIDES)
     if unknown:

@@ -1,8 +1,8 @@
-from collections import defaultdict, deque
 import os
 import secrets
 import time
-from typing import Deque
+from collections import defaultdict, deque
+from ipaddress import ip_address
 
 from fastapi import HTTPException, Request, Security, status
 from fastapi.security import APIKeyHeader
@@ -15,7 +15,6 @@ from app.config import (
     UPLOAD_RATE_LIMIT_REQUESTS,
 )
 
-
 API_KEY_HEADER_NAME = "X-API-Key"
 api_key_header = APIKeyHeader(name=API_KEY_HEADER_NAME, auto_error=False)
 
@@ -25,17 +24,40 @@ def configured_api_key() -> str | None:
     return value or None
 
 
-def unauthenticated_access_allowed() -> bool:
+def configured_environment() -> str:
+    return os.getenv("GEORISK_ENV", "development").strip().lower()
+
+
+def _is_loopback_client(request: Request | None) -> bool:
+    if request is None or request.client is None:
+        return False
+    host = request.client.host.strip().lower()
+    if host == "localhost":
+        return True
+    try:
+        return ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
+def unauthenticated_access_allowed(request: Request | None = None) -> bool:
     value = os.getenv("GEORISK_ALLOW_UNAUTHENTICATED", "").strip().lower()
-    return value in {"1", "true", "yes", "on"}
+    if value in {"1", "true", "yes", "on"}:
+        return True
+    return configured_environment() in {"development", "dev", "local"} and _is_loopback_client(
+        request
+    )
 
 
-def api_key_required() -> bool:
-    return not unauthenticated_access_allowed()
+def api_key_required(request: Request | None = None) -> bool:
+    return not unauthenticated_access_allowed(request)
 
 
-def require_api_key(api_key: str | None = Security(api_key_header)) -> None:
-    if unauthenticated_access_allowed():
+def require_api_key(
+    request: Request,
+    api_key: str | None = Security(api_key_header),
+) -> None:
+    if unauthenticated_access_allowed(request):
         return
 
     expected_api_key = configured_api_key()
@@ -66,8 +88,10 @@ class InMemoryRateLimiter:
             "/rag/upload": UPLOAD_RATE_LIMIT_REQUESTS,
             "/rag/ask": RAG_RATE_LIMIT_REQUESTS,
             "/reports/risk": RAG_RATE_LIMIT_REQUESTS,
+            "/reports/risk.pdf": RAG_RATE_LIMIT_REQUESTS,
+            "/reports/risk.docx": RAG_RATE_LIMIT_REQUESTS,
         }
-        self._hits: dict[tuple[str, str], Deque[float]] = defaultdict(deque)
+        self._hits: dict[tuple[str, str], deque[float]] = defaultdict(deque)
 
     def reset(self) -> None:
         self._hits.clear()

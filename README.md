@@ -17,10 +17,15 @@ tests, and documentation.
   `Radiation_Dose_Rate_Prediction` MVP-B environmental and nuclide CSV files
   with spatial block cross-validation.
 - Compare scenarios by changing input parameters and measuring predicted risk deltas.
+- Edit, save, and reload multi-feature scenarios as percentage changes.
 - Explain predictions using SHAP when available, with a feature-importance fallback.
+- Show tree-ensemble P10-P90 model spread, confidence labels, and extrapolation warnings.
+- Run batch CSV predictions, visualize color-coded points, compare regions, and export
+  CSV or GeoJSON.
 - Upload technical PDFs, retrieve relevant chunks, answer questions, and cite sources.
-- Generate a concise risk analysis report combining ML results, scenarios,
-  explainability, and document-grounded answers.
+- Generate professional Markdown, PDF, and DOCX risk reports combining ML results,
+  scenarios, explainability, and document-grounded answers.
+- Report dependency, model, dataset, index, authentication, and storage readiness.
 - Cache repeated predictions and expose request IDs/timing headers for API diagnostics.
 - Expose the system through FastAPI and a simple Streamlit operator UI.
 - Visualize the selected location in the Streamlit workflow and export results.
@@ -66,30 +71,28 @@ model retraining.
 
 ## Quickstart
 
-Recommended with `uv`:
+The unified Windows launcher discovers the active virtual environment, a project
+`.venv`, or a drive-level `.venv` such as `H:\.venv`:
 
 ```powershell
 Copy-Item .env.example .env
-# Edit .env and set GEORISK_API_KEY to a random local secret.
-uv run --with-requirements requirements-dev.txt python -m ml.train
-uv run --with-requirements requirements-dev.txt uvicorn app.main:app --reload
+.\start.ps1 -Install -OpenBrowser
 ```
 
-In another terminal:
+If Python is elsewhere, select it explicitly:
 
 ```powershell
-uv run --with-requirements requirements-dev.txt streamlit run frontend/streamlit_app.py
+.\start.ps1 -PythonPath H:\.venv\Scripts\python.exe -Install -OpenBrowser
 ```
 
-If you already have Python installed and prefer a classic virtual environment:
+Stop both services with:
 
 ```powershell
-py -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements-dev.txt
-python -m ml.train
-uvicorn app.main:app --reload
+.\stop.ps1
 ```
+
+Logs and PID files are stored in the ignored `.run` directory. For manual launch
+with `uv`, use the API and Streamlit commands from `docs/troubleshooting.md`.
 
 Open:
 
@@ -107,11 +110,15 @@ Copy-Item .env.example .env
 Important variables:
 
 - `GEORISK_API_URL`: frontend-to-backend URL.
+- `GEORISK_ENV`: `development` for loopback-only local access or `production` to
+  require API-key authentication for every protected request.
+- `GEORISK_FRONTEND_URL`: destination used by the API root-page redirect.
 - `GEORISK_DATA_MODE`: `synthetic` or `real`; current default endpoints remain
   synthetic, while advanced endpoints explicitly use real data.
-- `GEORISK_API_KEY`: required API key for protected endpoints.
-- `GEORISK_ALLOW_UNAUTHENTICATED`: local-only escape hatch. Keep `false` outside
-  throwaway demos.
+- `GEORISK_API_KEY`: required API key in production and for non-loopback clients.
+- `GEORISK_ALLOW_UNAUTHENTICATED`: explicit escape hatch for isolated throwaway
+  demos. Normal local development does not need it because only loopback requests
+  are allowed automatically.
 - `GEORISK_CORS_ALLOW_ORIGINS`: comma-separated browser origins allowed by CORS.
 - `GEORISK_RATE_LIMIT_*`: in-memory rate limiting controls.
 - `GEORISK_MODEL_PATH`: model artifact path.
@@ -217,9 +224,11 @@ This writes `docs/model_comparison.md`.
 ## API Endpoints
 
 - `GET /health`
+- `GET /health/details`
 - `POST /ml/train`
 - `POST /ml/train/advanced`
 - `POST /ml/predict`
+- `POST /ml/predict/batch`
 - `POST /ml/predict/advanced`
 - `POST /ml/scenarios`
 - `POST /ml/scenarios/advanced`
@@ -227,6 +236,8 @@ This writes `docs/model_comparison.md`.
 - `POST /rag/upload`
 - `POST /rag/ask`
 - `POST /reports/risk`
+- `POST /reports/risk.pdf`
+- `POST /reports/risk.docx`
 
 Example payloads are in `docs/api_examples.md`.
 
@@ -262,13 +273,14 @@ text extraction from scanned PDFs.
 
 ## Demo Flow
 
-1. Start the API and frontend.
+1. Start the API and frontend with `.\start.ps1`.
 2. Train or refresh the model from the sidebar.
 3. Run a baseline prediction.
 4. Compare wet-year, remediation, or water-pathway scenarios.
 5. Upload a technical PDF and ask a question.
-6. Generate a report that combines the prediction, scenario deltas, drivers, and
-   document-grounded context.
+6. Run a batch CSV and export its map data as CSV or GeoJSON.
+7. Generate Markdown, PDF, and DOCX reports that combine prediction uncertainty,
+   scenario deltas, drivers, and document-grounded context.
 
 ## Portfolio Notes
 

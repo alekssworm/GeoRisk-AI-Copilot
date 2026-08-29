@@ -90,6 +90,6 @@ class TfidfRAGStore:
             return cls()
         try:
             payload = joblib.load(path)
-        except Exception:
+        except Exception:  # noqa: BLE001 - corrupt indexes safely reset to an empty store
             return cls()
         return cls(chunks=payload.get("chunks", []))

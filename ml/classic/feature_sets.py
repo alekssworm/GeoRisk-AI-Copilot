@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-
 TARGET_COLUMN = "target_dose_rate"
 SECONDARY_TARGET_COLUMN = "target_dose_rate_0_1m"
 ID_COLUMNS = ("Code",)

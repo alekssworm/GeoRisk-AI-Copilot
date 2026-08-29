@@ -11,7 +11,6 @@ from sklearn.linear_model import RidgeCV
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
-
 DEFAULT_MODEL_NAME = "extra_trees"
 
 DEFAULT_MODEL_PARAMS: dict[str, dict[str, Any]] = {

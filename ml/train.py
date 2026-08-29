@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 import joblib
@@ -17,8 +17,8 @@ from ml.artifact import ModelArtifact
 from ml.config import (
     FEATURE_IMPORTANCE_PATH,
     METRICS_PATH,
-    MODEL_PATH,
     MODEL_FEATURE_COLUMNS,
+    MODEL_PATH,
     TARGET_COLUMN,
 )
 from ml.data import generate_synthetic_radiation_dataset

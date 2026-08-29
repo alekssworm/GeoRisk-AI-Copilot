@@ -1,40 +1,47 @@
-from pathlib import Path
 import logging
 import re
 import time
+from pathlib import Path
+from typing import Annotated
 from uuid import uuid4
 
 from anyio import fail_after, to_thread
 from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.responses import JSONResponse
-from starlette.responses import Response
+from starlette.responses import JSONResponse, RedirectResponse, Response
 
 from app.config import (
     CORS_ALLOW_CREDENTIALS,
     CORS_ALLOW_ORIGINS,
+    FRONTEND_URL,
     MAX_UPLOAD_BYTES,
     MAX_UPLOAD_MB,
     PDF_PROCESSING_TIMEOUT_SECONDS,
     UPLOAD_DIR,
 )
+from app.diagnostics import system_diagnostics
+from app.reporting import build_risk_report_docx, build_risk_report_pdf
 from app.schemas import (
     AdvancedPredictionResponse,
     AdvancedRadiationFeatures,
     AdvancedScenarioComparisonRequest,
     AdvancedTrainRequest,
+    BatchPredictionRequest,
+    BatchPredictionResponse,
     PredictionResponse,
+    RadiationFeatures,
     RAGAnswerResponse,
     RAGQuestionRequest,
     RiskReportRequest,
     RiskReportResponse,
     ScenarioComparisonRequest,
     TrainRequest,
-    RadiationFeatures,
 )
+from app.security import rate_limiter, require_api_key
 from app.services import (
     advanced_compare_for,
     advanced_prediction_for,
+    batch_predictions_for,
     compare_for,
     explanation_for,
     generate_report,
@@ -43,11 +50,9 @@ from app.services import (
 )
 from ml.classic.predict import clear_advanced_model_cache
 from ml.classic.train import train_advanced_model
-from app.security import require_api_key, rate_limiter
 from ml.predict import clear_prediction_cache
 from ml.train import train_model
 from rag.ingest import ingest_pdf
-
 
 logger = logging.getLogger("georisk.api")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -55,7 +60,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 app = FastAPI(
     title="GeoRisk AI Copilot",
     description="Environmental and radiation risk analysis with ML, explainability, and RAG.",
-    version="0.1.0",
+    version="0.2.0",
 )
 
 app.add_middleware(
@@ -71,6 +76,14 @@ def _clean_source_name(filename: str) -> str:
     name = Path(filename).name
     cleaned = re.sub(r"[^A-Za-z0-9._ -]", "_", name).strip(" .")
     return cleaned[:120] or "uploaded.pdf"
+
+
+def _risk_report_payload(request: RiskReportRequest) -> dict:
+    return generate_report(
+        baseline=request.baseline,
+        scenarios=request.scenarios,
+        rag_question=request.rag_question,
+    )
 
 
 @app.middleware("http")
@@ -109,9 +122,19 @@ async def add_request_observability(request: Request, call_next) -> Response:
     return response
 
 
+@app.get("/", include_in_schema=False)
+def root() -> RedirectResponse:
+    return RedirectResponse(FRONTEND_URL, status_code=307)
+
+
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok", "service": "GeoRisk AI Copilot"}
+
+
+@app.get("/health/details")
+def health_details() -> dict:
+    return system_diagnostics()
 
 
 @app.post("/ml/train", dependencies=[Depends(require_api_key)])
@@ -159,6 +182,15 @@ def predict(features: RadiationFeatures) -> dict:
 
 
 @app.post(
+    "/ml/predict/batch",
+    response_model=BatchPredictionResponse,
+    dependencies=[Depends(require_api_key)],
+)
+def predict_batch(request: BatchPredictionRequest) -> dict:
+    return batch_predictions_for(request.records)
+
+
+@app.post(
     "/ml/predict/advanced",
     response_model=AdvancedPredictionResponse,
     dependencies=[Depends(require_api_key)],
@@ -189,7 +221,7 @@ def explain(features: RadiationFeatures) -> dict:
 
 
 @app.post("/rag/upload", dependencies=[Depends(require_api_key)])
-async def upload_pdf(file: UploadFile = File(...)) -> dict:
+async def upload_pdf(file: Annotated[UploadFile, File()]) -> dict:
     if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Upload a PDF file.")
 
@@ -241,8 +273,24 @@ def ask_rag(request: RAGQuestionRequest) -> RAGAnswerResponse:
     "/reports/risk", response_model=RiskReportResponse, dependencies=[Depends(require_api_key)]
 )
 def risk_report(request: RiskReportRequest) -> dict:
-    return generate_report(
-        baseline=request.baseline,
-        scenarios=request.scenarios,
-        rag_question=request.rag_question,
+    return _risk_report_payload(request)
+
+
+@app.post("/reports/risk.pdf", dependencies=[Depends(require_api_key)])
+def risk_report_pdf(request: RiskReportRequest) -> Response:
+    content = build_risk_report_pdf(_risk_report_payload(request))
+    return Response(
+        content=content,
+        media_type="application/pdf",
+        headers={"Content-Disposition": 'attachment; filename="georisk-risk-report.pdf"'},
+    )
+
+
+@app.post("/reports/risk.docx", dependencies=[Depends(require_api_key)])
+def risk_report_docx(request: RiskReportRequest) -> Response:
+    content = build_risk_report_docx(_risk_report_payload(request))
+    return Response(
+        content=content,
+        media_type=("application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+        headers={"Content-Disposition": 'attachment; filename="georisk-risk-report.docx"'},
     )
