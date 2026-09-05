@@ -1,12 +1,13 @@
 import logging
 import re
 import time
+from functools import partial
 from pathlib import Path
 from typing import Annotated
 from uuid import uuid4
 
 from anyio import fail_after, to_thread
-from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse, RedirectResponse, Response
 
@@ -221,7 +222,9 @@ def explain(features: RadiationFeatures) -> dict:
 
 
 @app.post("/rag/upload", dependencies=[Depends(require_api_key)])
-async def upload_pdf(file: Annotated[UploadFile, File()]) -> dict:
+async def upload_pdf(
+    file: Annotated[UploadFile, File()], stable: Annotated[bool, Form()] = False
+) -> dict:
     if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Upload a PDF file.")
 
@@ -244,7 +247,7 @@ async def upload_pdf(file: Annotated[UploadFile, File()]) -> dict:
     try:
         with fail_after(PDF_PROCESSING_TIMEOUT_SECONDS):
             result = await to_thread.run_sync(
-                ingest_pdf,
+                partial(ingest_pdf, stable=stable),
                 destination,
                 source_name,
                 abandon_on_cancel=True,
@@ -260,13 +263,15 @@ async def upload_pdf(file: Annotated[UploadFile, File()]) -> dict:
         raise HTTPException(status_code=400, detail=f"Could not read PDF: {exc}") from exc
 
     if result["chunks_added"] == 0:
-        result["message"] = "PDF ingested, but no extractable text was found."
+        result["message"] = (
+            "No new chunks added: the PDF is already indexed or has no extractable text."
+        )
     return result
 
 
 @app.post("/rag/ask", response_model=RAGAnswerResponse, dependencies=[Depends(require_api_key)])
 def ask_rag(request: RAGQuestionRequest) -> RAGAnswerResponse:
-    return rag_answer_for(request.question, top_k=request.top_k)
+    return rag_answer_for(request.question, top_k=request.top_k, full_search=request.full_search)
 
 
 @app.post(

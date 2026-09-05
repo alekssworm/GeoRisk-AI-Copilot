@@ -488,25 +488,45 @@ with tabs[2]:
 with tabs[3]:
     st.subheader("Technical PDF Assistant")
     uploaded = st.file_uploader("Upload a technical PDF", type=["pdf"])
+    stable_document = st.checkbox(
+        "Keep as stable reference material",
+        help="Keep this document on the bottom shelf. It remains available when search expands.",
+    )
     if uploaded and st.button("Ingest PDF"):
         files = {"file": (uploaded.name, uploaded.getvalue(), "application/pdf")}
         with st.spinner("Indexing PDF..."):
-            ingested = post_api(api_url, "/rag/upload", files=files, timeout=120)
+            ingested = post_api(
+                api_url,
+                "/rag/upload",
+                files=files,
+                data={"stable": str(stable_document).lower()},
+                timeout=120,
+            )
         if ingested is not None:
             st.success(f"Ingested {ingested['chunks_added']} chunks")
 
     question = st.text_input("Ask a document-grounded question")
+    full_search = st.checkbox(
+        "Search all documents",
+        help="Include every shelf, even when the upper shelves already have relevant passages.",
+    )
     if st.button("Ask assistant", type="primary") and question:
         with st.spinner("Retrieving context..."):
             answer = post_api(
                 api_url,
                 "/rag/ask",
-                json={"question": question, "top_k": 4},
+                json={"question": question, "top_k": 4, "full_search": full_search},
                 timeout=120,
             )
         if answer is not None:
             st.write(answer["answer"])
             st.dataframe(pd.DataFrame(answer["citations"]), width="stretch")
+            retrieval = answer.get("retrieval", {})
+            if retrieval:
+                st.caption(
+                    f"Searched {retrieval['chunks_scored']} of {retrieval['total_chunks']} passages "
+                    f"across {len(retrieval['shelves_searched'])} shelves."
+                )
 
 with tabs[4]:
     st.subheader("Professional Risk Analysis Report")

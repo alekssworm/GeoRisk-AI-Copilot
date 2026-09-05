@@ -32,15 +32,20 @@ def ingest_pdf(
     path: str | Path,
     source_name: str | None = None,
     index_path: str | Path = RAG_INDEX_PATH,
+    *,
+    stable: bool = False,
 ) -> dict:
     chunks = extract_pdf_chunks(path, source_name=source_name)
-    store = TfidfRAGStore.load(index_path)
-    added = store.add_chunks(chunks)
-    store.save(index_path)
+    with TfidfRAGStore.transaction(index_path) as store:
+        added = store.add_chunks(chunks, stable=stable)
+        total_chunks = len(store.chunks)
+        shelf_counts = store.shelves.counts()
     return {
         "message": "PDF ingested",
         "source": source_name or Path(path).name,
         "chunks_added": added,
-        "total_chunks": len(store.chunks),
+        "total_chunks": total_chunks,
         "index_path": str(index_path),
+        "stable": stable,
+        "shelf_counts": shelf_counts,
     }

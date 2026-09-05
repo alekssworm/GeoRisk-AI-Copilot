@@ -45,8 +45,10 @@ def explanation_for(features: RadiationFeatures) -> dict:
     return explain_prediction(features.to_feature_dict())
 
 
-def rag_answer_for(question: str, top_k: int = 4) -> RAGAnswerResponse:
-    answer = RAGAssistant().answer(question, top_k=top_k)
+def rag_answer_for(
+    question: str, top_k: int = 4, *, full_search: bool = False
+) -> RAGAnswerResponse:
+    answer = RAGAssistant().answer(question, top_k=top_k, full_search=full_search)
     return RAGAnswerResponse(**answer)
 
 

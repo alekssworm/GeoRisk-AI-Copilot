@@ -207,12 +207,14 @@ class AdvancedTrainRequest(StrictBaseModel):
 class RAGQuestionRequest(StrictBaseModel):
     question: str = Field(..., min_length=3, max_length=4000)
     top_k: int = Field(4, ge=1, le=10)
+    full_search: bool = Field(False, description="Search all shelves without early stopping")
 
 
 class RAGAnswerResponse(StrictBaseModel):
     answer: str
     citations: list[dict[str, Any]]
     retrieved_context: list[dict[str, Any]]
+    retrieval: dict[str, Any] = Field(default_factory=dict)
 
 
 class RiskReportRequest(StrictBaseModel):

@@ -23,6 +23,8 @@ tests, and documentation.
 - Run batch CSV predictions, visualize color-coded points, compare regions, and export
   CSV or GeoJSON.
 - Upload technical PDFs, retrieve relevant chunks, answer questions, and cite sources.
+- Search bounded RAG shelves: keep new and popular passages near the top, retain
+  stable references on the bottom, and expand retrieval when more evidence is needed.
 - Generate professional Markdown, PDF, and DOCX risk reports combining ML results,
   scenarios, explainability, and document-grounded answers.
 - Report dependency, model, dataset, index, authentication, and storage readiness.
@@ -64,6 +66,16 @@ offline and inside tests. The RAG layer is isolated behind a small interface and
 can be swapped for Chroma or FAISS. If `OPENAI_API_KEY` is set, the assistant uses
 an LLM for grounded synthesis; otherwise it returns evidence-focused fallback
 answers with citations.
+
+Retrieval starts on a small top shelf (64 passages by default), then expands to
+the middle shelf (256) and the bottom archive when there are too few strong
+matches or query terms are missing. New arrivals reserve 16 top-shelf places;
+the remaining places favor frequently retrieved passages, with popularity decaying
+over subsequent searches. All overflow remains searchable. Mark a PDF as **stable
+reference material** at upload to keep it on the bottom shelf. **Search all
+documents** disables early stopping when you need comparison across the full
+corpus. Shelf history and fitted vectors survive restarts, and existing indexes
+upgrade automatically. See [RAG shelves](docs/rag_shelves.md) for policy and limits.
 
 API responses include `X-Request-ID` and `X-Process-Time-ms` headers. Repeated
 ML predictions use an in-process LRU cache, which is cleared automatically after
@@ -134,6 +146,11 @@ Important variables:
 - `GEORISK_MAX_UPLOAD_MB`: max PDF upload size.
 - `GEORISK_PDF_PROCESSING_TIMEOUT_SECONDS`: PDF ingestion timeout.
 - `GEORISK_RAG_CHUNK_SIZE` and `GEORISK_RAG_CHUNK_OVERLAP`: retrieval chunking controls.
+- `GEORISK_RAG_TOP_CAPACITY`, `GEORISK_RAG_MIDDLE_CAPACITY`, and
+  `GEORISK_RAG_RECENT_SLOTS`: sizes of the working shelves and reserved arrival slots.
+- `GEORISK_RAG_HEAT_HALF_LIFE`: searches until a passage's popularity halves (50).
+- `GEORISK_RAG_MIN_SCORE_PCT`: minimum cosine score percentage for early stopping
+  and popularity credit (35); early stopping also requires coverage of query terms.
 - `GEORISK_LLM_MAX_PROMPT_CHARS`: max prompt size sent to the LLM client.
 - `OPENAI_API_KEY`: optional key for LLM-based answer synthesis.
 - `GEORISK_LLM_MODEL`: optional LLM model name.

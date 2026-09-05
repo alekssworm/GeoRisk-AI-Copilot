@@ -1,3 +1,4 @@
+import pytest
 from fastapi.testclient import TestClient
 
 import app.main as main_module
@@ -221,13 +222,15 @@ def test_pdf_upload_rejects_invalid_pdf(monkeypatch):
     assert "Could not read PDF" in response.json()["detail"]
 
 
-def test_pdf_upload_uses_generated_storage_name(monkeypatch):
+@pytest.mark.parametrize("stable", [False, True])
+def test_pdf_upload_uses_generated_storage_name(monkeypatch, stable):
     configure_api_key(monkeypatch)
     captured = {}
 
-    def fake_ingest_pdf(path, source_name=None):
+    def fake_ingest_pdf(path, source_name=None, *, stable=False):
         captured["path"] = path
         captured["source_name"] = source_name
+        captured["stable"] = stable
         return {
             "message": "PDF ingested",
             "source": source_name,
@@ -242,6 +245,7 @@ def test_pdf_upload_uses_generated_storage_name(monkeypatch):
     response = client.post(
         "/rag/upload",
         files={"file": ("../../etc/passwd.pdf", b"%PDF-1.4 test", "application/pdf")},
+        data={"stable": "true"} if stable else {},
         headers=AUTH_HEADERS,
     )
 
@@ -249,3 +253,44 @@ def test_pdf_upload_uses_generated_storage_name(monkeypatch):
     assert captured["path"].name.startswith("upload_")
     assert captured["path"].name.endswith(".pdf")
     assert captured["source_name"] == "passwd.pdf"
+    assert captured["stable"] is stable
+
+
+def test_rag_endpoint_returns_shelf_trace_and_persists_popularity(monkeypatch, tmp_path):
+    import rag.qa as qa_module
+    from rag.llm import LLMClient
+    from rag.store import TfidfRAGStore
+    from rag.text import chunk_text
+
+    configure_api_key(monkeypatch)
+    path = tmp_path / "rag.joblib"
+    monkeypatch.setattr(qa_module, "RAG_INDEX_PATH", path)
+    monkeypatch.setattr(LLMClient, "generate", lambda *args: None)
+    store = TfidfRAGStore(chunk_text("rainfall runoff monitoring", source="new.pdf", page=1))
+    store.add_chunks(chunk_text("cesium clay retention", source="stable.pdf", page=7), stable=True)
+    store.save(path)
+    client = TestClient(app)
+
+    first = client.post(
+        "/rag/ask",
+        json={"question": "cesium clay retention", "top_k": 1},
+        headers=AUTH_HEADERS,
+    )
+    assert first.status_code == 200
+    payload = first.json()
+    assert payload["citations"][0]["page"] == 7
+    assert payload["retrieved_context"][0]["shelf"] == 3
+    assert payload["retrieval"]["shelves_searched"] == [1, 3]
+    assert payload["retrieval"]["mode"] == "shelves"
+
+    second = client.post(
+        "/rag/ask",
+        json={"question": "rainfall runoff monitoring", "top_k": 1, "full_search": True},
+        headers=AUTH_HEADERS,
+    )
+    assert second.status_code == 200
+    assert second.json()["retrieval"]["mode"] == "all"
+    assert second.json()["retrieval"]["chunks_scored"] == 2
+    reloaded = TfidfRAGStore.load(path)
+    assert [entry.hits for entry in reloaded.shelves.entries] == [1, 1]
+    assert reloaded.shelves.indices[3] == [1]

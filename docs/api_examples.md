@@ -110,5 +110,34 @@ curl -X POST http://localhost:8000/rag/ask \
   -d '{"question": "What monitoring actions are recommended after heavy rainfall?", "top_k": 4}'
 ```
 
+Upload new material to the working shelves (omit `stable` or set it to `false`):
+
+```bash
+curl -X POST http://localhost:8000/rag/upload \
+  -H "X-API-Key: $GEORISK_API_KEY" \
+  -F 'file=@monitoring-update.pdf'
+```
+
+Keep a stable reference document on the bottom shelf:
+
+```bash
+curl -X POST http://localhost:8000/rag/upload \
+  -H "X-API-Key: $GEORISK_API_KEY" \
+  -F 'file=@reference-manual.pdf' -F 'stable=true'
+```
+
+Search every shelf when a full-corpus comparison is needed:
+
+```bash
+curl -X POST http://localhost:8000/rag/ask \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: $GEORISK_API_KEY" \
+  -d '{"question": "What affects cesium mobility?", "top_k": 4, "full_search": true}'
+```
+
+Answers include `retrieval.shelves_searched`, `retrieval.chunks_scored`, and
+`retrieval.total_chunks` to inspect search scope. Each retrieved context passage
+also includes its original `shelf` number. See [RAG shelves](rag_shelves.md).
+
 Protected POST endpoints require `X-API-Key` unless
 `GEORISK_ALLOW_UNAUTHENTICATED=true` is explicitly enabled for local demos.

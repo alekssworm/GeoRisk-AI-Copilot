@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from rag.config import RAG_INDEX_PATH
 from rag.llm import LLMClient
 from rag.store import TfidfRAGStore
@@ -8,8 +10,12 @@ class RAGAssistant:
         self,
         store: TfidfRAGStore | None = None,
         llm_client: LLMClient | None = None,
+        *,
+        index_path: str | Path | None = None,
     ):
-        self.store = store or TfidfRAGStore.load(RAG_INDEX_PATH)
+        self.store = store
+        self.index_path = Path(index_path) if index_path is not None else RAG_INDEX_PATH
+        self._persistent = store is None
         self.llm_client = llm_client or LLMClient()
 
     def _build_prompt(self, question: str, results: list[dict]) -> str:
@@ -51,8 +57,16 @@ Instructions:
             + " Configure OPENAI_API_KEY to enable full LLM synthesis."
         )
 
-    def answer(self, question: str, top_k: int = 4) -> dict:
-        results = self.store.search(question, top_k=top_k)
+    def answer(self, question: str, top_k: int = 4, *, full_search: bool = False) -> dict:
+        if self._persistent:
+            with TfidfRAGStore.transaction(self.index_path) as store:
+                results = store.search(question, top_k=top_k, full_search=full_search)
+                retrieval = dict(store.last_search)
+                self.store = store
+        else:
+            results = self.store.search(question, top_k=top_k, full_search=full_search)
+            retrieval = dict(self.store.last_search)
+        # Persist popularity and release the index lock before LLM synthesis.
         prompt = self._build_prompt(question, results)
         generated = self.llm_client.generate(prompt)
         if not generated:
@@ -69,6 +83,7 @@ Instructions:
                 "page": citation["page"],
                 "score": citation["score"],
                 "text": result["text"],
+                "shelf": result["shelf"],
             }
             for result, citation in zip(results, citations, strict=False)
         ]
@@ -76,4 +91,5 @@ Instructions:
             "answer": generated,
             "citations": citations,
             "retrieved_context": retrieved_context,
+            "retrieval": retrieval,
         }
